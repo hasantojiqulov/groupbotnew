@@ -2,12 +2,16 @@ import os
 import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import BaseFilter
-from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 from dotenv import load_dotenv
 
+# 🔹 .env faylni yuklash
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
+
+if TOKEN is None:
+    raise ValueError("❌ BOT_TOKEN .env faylidan topilmadi yoki noto‘g‘ri!")
 
 bot = Bot(token=TOKEN)
 dp = Dispatcher()
@@ -15,6 +19,7 @@ dp = Dispatcher()
 CHANNELS = ["@mrxakimoff_eftbl", "@hasantojiqulovoffical"]
 warned_users = set()
 
+# 🔹 Obuna tugmalari
 def subscription_keyboard():
     builder = InlineKeyboardBuilder()
     for i, channel in enumerate(CHANNELS, 1):
@@ -27,6 +32,7 @@ def subscription_keyboard():
     builder.row(InlineKeyboardButton(text="✅ Obuna bo‘ldim", callback_data="sub_confirm"))
     return builder.as_markup()
 
+# 🔹 Reklama filteri
 class AdvertisementFilter(BaseFilter):
     async def __call__(self, message: types.Message) -> bool:
         if message.content_type in [
@@ -39,6 +45,7 @@ class AdvertisementFilter(BaseFilter):
             return True
         return False
 
+# 🔹 Kanalga obuna tekshirish
 async def check_subscription_status(user_id: int):
     for channel in CHANNELS:
         try:
@@ -49,7 +56,7 @@ async def check_subscription_status(user_id: int):
             return False
     return True
 
-# 🔹 Guruhga yangi foydalanuvchi qo‘shilganda xush kelibsiz
+# 🔹 Guruhga yangi foydalanuvchi qo‘shilganda
 async def welcome_new_members(message: types.Message):
     for user in message.new_chat_members:
         await message.reply(
@@ -77,7 +84,7 @@ async def check_subscription(message: types.Message):
 
 dp.message.register(check_subscription, AdvertisementFilter())
 
-# 🔹 Obuna tasdiqlash tugmasi
+# 🔹 Callback tugma
 async def sub_confirm(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     is_sub = await check_subscription_status(user_id)
@@ -91,6 +98,7 @@ async def sub_confirm(callback: types.CallbackQuery):
 
 dp.callback_query.register(sub_confirm, lambda c: c.data == "sub_confirm")
 
+# 🔹 Botni ishga tushirish
 if __name__ == "__main__":
     print("🤖 Bot ishlayapti...")
     asyncio.run(dp.start_polling(bot))
