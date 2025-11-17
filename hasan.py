@@ -14,7 +14,7 @@ dp = Dispatcher()
 
 CHANNELS = ["@mrxakimoff_eftbl", "@hasantojiqulovoffical"]
 
-# Kimga aytilganini saqlash
+# Kimga ogohlantirish berilganini saqlash
 warned_users = set()
 
 def subscription_keyboard():
@@ -31,15 +31,19 @@ def subscription_keyboard():
 
 class AdvertisementFilter(BaseFilter):
     async def __call__(self, message: types.Message) -> bool:
-        if message.content_type in [
-            types.ContentType.PHOTO, types.ContentType.VIDEO,
-            types.ContentType.DOCUMENT, types.ContentType.ANIMATION,
-            types.ContentType.VIDEO_NOTE, types.ContentType.STICKER
-        ]:
-            return True
-        if message.text and ("t.me/" in message.text or "http" in message.text):
-            return True
-        return False
+        try:
+            if message.content_type in [
+                types.ContentType.PHOTO, types.ContentType.VIDEO,
+                types.ContentType.DOCUMENT, types.ContentType.ANIMATION,
+                types.ContentType.VIDEO_NOTE, types.ContentType.STICKER
+            ]:
+                return True
+            if message.text and ("t.me/" in message.text or "http" in message.text):
+                return True
+            return False
+        except Exception as e:
+            print(f"AdvertisementFilter xato: {e}")
+            return False
 
 async def check_subscription_status(user_id: int):
     for channel in CHANNELS:
@@ -47,39 +51,60 @@ async def check_subscription_status(user_id: int):
             member = await bot.get_chat_member(chat_id=channel, user_id=user_id)
             if member.status in ["left", "kicked"]:
                 return False
-        except:
+        except Exception as e:
+            print(f"check_subscription_status xato: {e}")
             return False
     return True
 
+# 🔹 Guruhga yangi foydalanuvchi qo‘shilganda
+@dp.message_handler(content_types=types.ContentType.NEW_CHAT_MEMBERS)
+async def welcome_new_members(message: types.Message):
+    try:
+        for user in message.new_chat_members:
+            await message.reply(f"👋 Salom, {user.full_name}! Guruhga xush kelibsiz!\n"
+                                f"🚨 Guruhda reklama yuborish uchun quyidagi kanallarga obuna bo‘lishingiz shart.",
+                                reply_markup=subscription_keyboard())
+    except Exception as e:
+        print(f"welcome_new_members xato: {e}")
+
+# 🔹 Reklama yuborilsa tekshiradi
 @dp.message(AdvertisementFilter())
 async def check_subscription(message: types.Message):
     user_id = message.from_user.id
-    await message.delete()
+    try:
+        is_sub = await check_subscription_status(user_id)
 
-    is_sub = await check_subscription_status(user_id)
+        if not is_sub:
+            # Foydalanuvchi reklama yubordi, lekin obuna emas → xabar o‘chirib, ogohlantirish beradi
+            await message.delete()
+            if user_id not in warned_users:
+                warned_users.add(user_id)
+                await message.answer(
+                    "🚫 Reklama ruxsat etilmagan! Majburiy kanallarga obuna bo‘ling!",
+                    reply_markup=subscription_keyboard()
+                )
+        else:
+            # Obuna bo‘lgan foydalanuvchi reklama yuborishi mumkin
+            if user_id in warned_users:
+                warned_users.discard(user_id)
+    except Exception as e:
+        print(f"check_subscription xato: {e}")
 
-    if not is_sub:
-        if user_id not in warned_users:
-            warned_users.add(user_id)
-            await message.answer(
-                "🚫 Reklama ruxsat etilmagan! Majburiy kanallarga obuna bo‘ling!",
-                reply_markup=subscription_keyboard()
-            )
-    else:
-        pass  # Obuna bo'lgan reklama foydalanuvchi reklama yuborishi mumkin
-
+# 🔹 Obuna tasdiqlash tugmasi
 @dp.callback_query(lambda c: c.data == "sub_confirm")
 async def sub_confirm(callback: types.CallbackQuery):
     user_id = callback.from_user.id
-    is_sub = await check_subscription_status(user_id)
-
-    if is_sub:
-        warned_users.discard(user_id)
-        await callback.message.edit_text(
-            "✅ Ruxsat berildi, endi reklama yuborishingiz mumkin!"
-        )
-    else:
-        await callback.answer("⚠️ Hali ham barcha kanallarga obuna emassiz!", show_alert=True)
+    try:
+        is_sub = await check_subscription_status(user_id)
+        if is_sub:
+            warned_users.discard(user_id)
+            await callback.message.edit_text(
+                "✅ Ruxsat berildi, endi reklama yuborishingiz mumkin!"
+            )
+        else:
+            await callback.answer("⚠️ Hali ham barcha kanallarga obuna emassiz!", show_alert=True)
+    except Exception as e:
+        print(f"sub_confirm xato: {e}")
 
 if __name__ == "__main__":
     print("🤖 Bot ishlayapti...")
