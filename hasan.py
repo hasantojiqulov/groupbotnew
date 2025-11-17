@@ -1,10 +1,10 @@
+import os
+import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import BaseFilter
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.types import InlineKeyboardButton
 from dotenv import load_dotenv
-import os
-import asyncio
 
 load_dotenv()
 TOKEN = os.getenv("BOT_TOKEN")
@@ -49,8 +49,7 @@ async def check_subscription_status(user_id: int):
             return False
     return True
 
-# 🔹 Guruhga yangi foydalanuvchi qo‘shilganda
-@dp.message.register(content_types=types.ContentType.NEW_CHAT_MEMBERS)
+# 🔹 Guruhga yangi foydalanuvchi qo‘shilganda xush kelibsiz
 async def welcome_new_members(message: types.Message):
     for user in message.new_chat_members:
         await message.reply(
@@ -59,8 +58,9 @@ async def welcome_new_members(message: types.Message):
             reply_markup=subscription_keyboard()
         )
 
+dp.message.register(welcome_new_members, content_types=types.ContentType.NEW_CHAT_MEMBERS)
+
 # 🔹 Reklama yuborilsa tekshiradi
-@dp.message.register(AdvertisementFilter())
 async def check_subscription(message: types.Message):
     user_id = message.from_user.id
     is_sub = await check_subscription_status(user_id)
@@ -75,8 +75,9 @@ async def check_subscription(message: types.Message):
     else:
         warned_users.discard(user_id)
 
+dp.message.register(check_subscription, AdvertisementFilter())
+
 # 🔹 Obuna tasdiqlash tugmasi
-@dp.callback_query.register(lambda c: c.data == "sub_confirm")
 async def sub_confirm(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     is_sub = await check_subscription_status(user_id)
@@ -87,6 +88,8 @@ async def sub_confirm(callback: types.CallbackQuery):
         )
     else:
         await callback.answer("⚠️ Hali ham barcha kanallarga obuna emassiz!", show_alert=True)
+
+dp.callback_query.register(sub_confirm, lambda c: c.data == "sub_confirm")
 
 if __name__ == "__main__":
     print("🤖 Bot ishlayapti...")
